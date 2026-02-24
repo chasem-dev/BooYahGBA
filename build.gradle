@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'maven-publish'
 }
 
 group = 'ygba'
@@ -177,4 +178,20 @@ tasks.register('runHeadless', JavaExec) {
         headlessArgs += ['--screenshot', project.property('screenshot').toString()]
     }
     args headlessArgs
+}
+
+// Publishing for JitPack
+java {
+    withSourcesJar()
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            groupId = 'ygba'
+            artifactId = 'yahgba'
+            version = project.version
+        }
+    }
 }
