@@ -1,12 +1,15 @@
 package ygba.gfx;
 
 import java.awt.*;
+import java.awt.image.*;
 import javax.swing.*;
 
 public final class GFXScreen
-        extends JComponent {
+        extends JComponent
+        implements GFX.FrameListener {
 
     private GFX gfx;
+    private MemoryImageSource imageSource;
     private Image image;
 
     private static final int NATIVE_W = GFX.XScreenSize;  // 240
@@ -15,12 +18,23 @@ public final class GFXScreen
 
     public GFXScreen(GFX gfx) {
         this.gfx = gfx;
-        image = gfx.getImage();
+
+        int[] pixels = gfx.getPixels();
+        imageSource = new MemoryImageSource(NATIVE_W, NATIVE_H,
+            new DirectColorModel(32, 0x00FF0000, 0x0000FF00, 0x000000FF), pixels, 0, NATIVE_W);
+        imageSource.setAnimated(true);
+        image = Toolkit.getDefaultToolkit().createImage(imageSource);
+
+        gfx.setFrameListener(this);
 
         setPreferredSize(new Dimension(NATIVE_W * 2, NATIVE_H * 2));
         setMinimumSize(new Dimension(NATIVE_W, NATIVE_H));
         setBackground(Color.BLACK);
         setOpaque(true);
+    }
+
+    public void onFrameReady(int[] pixels) {
+        imageSource.newPixels();
     }
 
     protected void paintComponent(Graphics g) {

@@ -6,7 +6,6 @@ import ygba.gfx.GFX;
 import ygba.time.Time;
 import ygba.time.Timer;
 
-import java.awt.event.KeyEvent;
 import java.util.Arrays;
 
 public final class IORegMemory
@@ -728,32 +727,27 @@ public final class IORegMemory
         System.out.printf("[VREG] %s=%04X%n", regName, value);
     }
 
-    // ----- Keypad
-    
-    private static short keyInput(int keyCode) {
-        switch (keyCode) {
-            case KeyEvent.VK_X:          return 0x0001;
-            case KeyEvent.VK_C:          return 0x0002;
-            case KeyEvent.VK_BACK_SPACE: return 0x0004;
-            case KeyEvent.VK_SPACE:      return 0x0004;
-            case KeyEvent.VK_ENTER:      return 0x0008;
-            case KeyEvent.VK_RIGHT:      return 0x0010;
-            case KeyEvent.VK_LEFT:       return 0x0020;
-            case KeyEvent.VK_UP:         return 0x0040;
-            case KeyEvent.VK_DOWN:       return 0x0080;
-            case KeyEvent.VK_D:          return 0x0100;
-            case KeyEvent.VK_S:          return 0x0200;
-            default:                     return 0x0000;
-        }
-    }
-    
-    public void keyPressed(int keyCode) {
-        keyInput &= ~keyInput(keyCode);
+    // ----- Keypad (GBA button bitmasks)
+
+    public static final int
+            BTN_A      = 0x0001,
+            BTN_B      = 0x0002,
+            BTN_SELECT = 0x0004,
+            BTN_START  = 0x0008,
+            BTN_RIGHT  = 0x0010,
+            BTN_LEFT   = 0x0020,
+            BTN_UP     = 0x0040,
+            BTN_DOWN   = 0x0080,
+            BTN_R      = 0x0100,
+            BTN_L      = 0x0200;
+
+    public void pressButton(int btnMask) {
+        keyInput &= ~(short) btnMask;
         setHalfWord(REG_P1, keyInput);
     }
-    
-    public void keyReleased(int keyCode) {
-        keyInput |= keyInput(keyCode);
+
+    public void releaseButton(int btnMask) {
+        keyInput |= (short) btnMask;
         setHalfWord(REG_P1, keyInput);
     }
     

@@ -758,7 +758,11 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 
 		try {
 			if (resumeAfterDump) ygba.stop();
-			BufferedImage frame = ygba.getGraphics().getFrameImage();
+			BufferedImage frame = new BufferedImage(
+					ygba.getGraphics().XScreenSize, ygba.getGraphics().YScreenSize,
+					BufferedImage.TYPE_INT_ARGB);
+			frame.setRGB(0, 0, ygba.getGraphics().XScreenSize, ygba.getGraphics().YScreenSize,
+					ygba.getGraphics().getPixels(), 0, ygba.getGraphics().XScreenSize);
 			long frameCRC32 = crc32Frame(frame);
 			ImageIO.write(frame, "png", pngFile);
 			dumpState(txtFile, pngFile.getName(), frameCRC32);
@@ -891,11 +895,30 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 			break;
 		}
 
-		iorMem.keyPressed(ke.getKeyCode());
+		int btn = keyToButton(ke.getKeyCode());
+		if (btn != 0) iorMem.pressButton(btn);
 	}
 
 	public void keyReleased(KeyEvent ke) {
-		iorMem.keyReleased(ke.getKeyCode());
+		int btn = keyToButton(ke.getKeyCode());
+		if (btn != 0) iorMem.releaseButton(btn);
+	}
+
+	private static int keyToButton(int keyCode) {
+		switch (keyCode) {
+			case KeyEvent.VK_X:          return IORegMemory.BTN_A;
+			case KeyEvent.VK_C:          return IORegMemory.BTN_B;
+			case KeyEvent.VK_BACK_SPACE: return IORegMemory.BTN_SELECT;
+			case KeyEvent.VK_SPACE:      return IORegMemory.BTN_SELECT;
+			case KeyEvent.VK_ENTER:      return IORegMemory.BTN_START;
+			case KeyEvent.VK_RIGHT:      return IORegMemory.BTN_RIGHT;
+			case KeyEvent.VK_LEFT:       return IORegMemory.BTN_LEFT;
+			case KeyEvent.VK_UP:         return IORegMemory.BTN_UP;
+			case KeyEvent.VK_DOWN:       return IORegMemory.BTN_DOWN;
+			case KeyEvent.VK_D:          return IORegMemory.BTN_R;
+			case KeyEvent.VK_S:          return IORegMemory.BTN_L;
+			default:                     return 0;
+		}
 	}
 
 	public void keyTyped(KeyEvent ke) {

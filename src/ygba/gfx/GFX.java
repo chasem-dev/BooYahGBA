@@ -6,11 +6,13 @@ import ygba.memory.PaletteMemory;
 import ygba.memory.VideoMemory;
 import ygba.memory.ObjectMemory;
 
-import java.awt.*;
-import java.awt.image.*;
 import java.util.zip.CRC32;
 
 public final class GFX {
+
+    public interface FrameListener {
+        void onFrameReady(int[] pixels);
+    }
 
     public final static int
             XScreenSize = 240,
@@ -33,8 +35,7 @@ public final class GFX {
     private static final int LAYER_BD = 5;
     private static final int WIN_SFX_BIT = 0x20;
 
-    private MemoryImageSource imageSource;
-    private Image image;
+    private FrameListener frameListener;
 
     private IORegMemory iorMem;
     private PaletteMemory palMem;
@@ -44,10 +45,6 @@ public final class GFX {
 
     public GFX() {
         pixels = new int[XScreenSize * YScreenSize];
-        imageSource = new MemoryImageSource(XScreenSize, YScreenSize,
-            new DirectColorModel(32, 0x00FF0000, 0x0000FF00, 0x000000FF), pixels, 0, XScreenSize);
-        imageSource.setAnimated(true);
-        image = Toolkit.getDefaultToolkit().createImage(imageSource);
     }
 
     public void connectToMemory(Memory memory) {
@@ -57,6 +54,14 @@ public final class GFX {
         objMem = (ObjectMemory) memory.getBank(0x07);
     }
 
+    public void setFrameListener(FrameListener listener) {
+        this.frameListener = listener;
+    }
+
+    public int[] getPixels() {
+        return pixels;
+    }
+
     public void reset() {
         for (int i = 0; i < pixels.length; i++) pixels[i] = 0;
         for (int layer = 0; layer < layerFrames.length; layer++) {
@@ -64,16 +69,7 @@ public final class GFX {
                 layerFrames[layer][i] = 0;
             }
         }
-        imageSource.newPixels();
-        image.flush();
-    }
-
-    public Image getImage() { return image; }
-
-    public BufferedImage getFrameImage() {
-        BufferedImage frame = new BufferedImage(XScreenSize, YScreenSize, BufferedImage.TYPE_INT_ARGB);
-        frame.setRGB(0, 0, XScreenSize, YScreenSize, pixels, 0, XScreenSize);
-        return frame;
+        if (frameListener != null) frameListener.onFrameReady(pixels);
     }
 
     private static long crc32Pixels(int[] data) {
@@ -114,7 +110,7 @@ public final class GFX {
                 case 5: drawMode5Line(y); break;
             }
         } else if (y == YScreenSize) {
-            imageSource.newPixels();
+            if (frameListener != null) frameListener.onFrameReady(pixels);
         }
     }
 

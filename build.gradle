@@ -156,3 +156,25 @@ tasks.register('captureDumps', JavaExec) {
 
     standardInput = System.in
 }
+
+tasks.register('runHeadless', JavaExec) {
+    group = 'application'
+    description = 'Run YahGBA in headless mode (no GUI)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ygba.ui.HeadlessMain'
+
+    def headlessArgs = []
+    if (project.hasProperty('bios')) {
+        headlessArgs += ['--bios', project.property('bios').toString()]
+    }
+    if (project.hasProperty('rom')) {
+        headlessArgs += ['--rom', project.property('rom').toString()]
+    }
+    if (project.hasProperty('frames')) {
+        headlessArgs += ['--frames', project.property('frames').toString()]
+    }
+    if (project.hasProperty('screenshot')) {
+        headlessArgs += ['--screenshot', project.property('screenshot').toString()]
+    }
+    args headlessArgs
+}

@@ -5,14 +5,15 @@ import ygba.memory.Memory;
 import ygba.memory.IORegMemory;
 import ygba.time.Time;
 
-final class YGBACore
+public final class YGBACore
         implements Runnable {
-    
+
     private ARM7TDMI cpu;
     private IORegMemory iorMem;
     private Time time;
-    
+
     private boolean stopped;
+    private boolean framePacing = true;
     private final boolean debugConsole;
     private final boolean debugStatus;
 
@@ -55,6 +56,23 @@ final class YGBACore
     // GBA runs at ~59.7275 fps => ~16.743 ms per frame
     private final static long FRAME_TIME_NS = 16_743_000L;
 
+    public void setFramePacing(boolean enabled) {
+        this.framePacing = enabled;
+    }
+
+    public void runOneFrame() {
+        for (int scanline = 0; scanline < VLines; scanline++) {
+            iorMem.setCurrentScanline(scanline);
+            cpu.run(CyclesPerHDraw);
+            iorMem.enterHBlank();
+            cpu.run(CyclesPerHBlank);
+            iorMem.exitHBlank();
+            time.addTime(CyclesPerLine);
+            if (scanline == VDrawLines - 1) iorMem.enterVBlank();
+            else if (scanline == VLines - 1) iorMem.exitVBlank();
+        }
+    }
+
     public void run() {
         stopped = false;
 
@@ -63,32 +81,24 @@ final class YGBACore
         statusFrameCount = 0;
 
         while (!stopped) {
-            for (int scanline = 0; scanline < VLines; scanline++) {
-                iorMem.setCurrentScanline(scanline);
-                cpu.run(CyclesPerHDraw);
-                iorMem.enterHBlank();
-                cpu.run(CyclesPerHBlank);
-                iorMem.exitHBlank();
-                time.addTime(CyclesPerLine);
-                if (scanline == VDrawLines - 1) iorMem.enterVBlank();
-                else if (scanline == VLines - 1) iorMem.exitVBlank();
-            }
+            runOneFrame();
 
             if (debugConsole) logIfStalled();
             if (debugStatus) logPeriodicStatus();
 
-            // Frame rate limiting: wait until the frame's time budget is spent
-            long elapsed = System.nanoTime() - frameStart;
-            long sleepNs = FRAME_TIME_NS - elapsed;
-            if (sleepNs > 0) {
-                try {
-                    Thread.sleep(sleepNs / 1_000_000, (int) (sleepNs % 1_000_000));
-                } catch (InterruptedException e) {}
+            if (framePacing) {
+                long elapsed = System.nanoTime() - frameStart;
+                long sleepNs = FRAME_TIME_NS - elapsed;
+                if (sleepNs > 0) {
+                    try {
+                        Thread.sleep(sleepNs / 1_000_000, (int) (sleepNs % 1_000_000));
+                    } catch (InterruptedException e) {}
+                }
+                frameStart = System.nanoTime();
             }
-            frameStart = System.nanoTime();
         }
     }
-    
+
     public void stop() {
         stopped = true;
     }

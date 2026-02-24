@@ -53,6 +53,14 @@ public final class YGBA {
     public Time getTime() { return time; }
     
     
+    public void runOneFrame() {
+        ygbaCore.runOneFrame();
+    }
+
+    public void setFramePacing(boolean enabled) {
+        ygbaCore.setFramePacing(enabled);
+    }
+
     public void reset() {
         cpu.reset();
         memory.reset();
