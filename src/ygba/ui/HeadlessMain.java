@@ -40,6 +40,15 @@ public final class HeadlessMain {
             System.exit(1);
         }
 
+        if (!new File(biosPath).exists()) {
+            System.err.println("[HEADLESS] BIOS file not found: " + biosPath);
+            System.exit(1);
+        }
+        if (!new File(romPath).exists()) {
+            System.err.println("[HEADLESS] ROM file not found: " + romPath);
+            System.exit(1);
+        }
+
         System.out.println("[HEADLESS] bios=" + biosPath);
         System.out.println("[HEADLESS] rom=" + romPath);
         System.out.println("[HEADLESS] frames=" + frames);
