@@ -9,7 +9,7 @@ public final class THUMB_1 {
         int rdIndex = opcode & 0x0007;
         int rsIndex = (opcode >>> 3) & 0x0007;
         int rsValue = cpu.getRegister(rsIndex);
-        int rdValue = 0;
+        int rdValue = rsValue;
         int shiftAmount = (opcode >>> 6) & 0x001F;
         
         switch (opcode & 0x1800) {

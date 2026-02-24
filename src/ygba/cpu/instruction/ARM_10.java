@@ -40,13 +40,13 @@ public final class ARM_10 {
         } else { // Load from memory
             switch (instruction) {
                 case 0x00000020: // LDR{cond}H  Rd, <Address>
-                    cpu.setRegister(rdIndex, memory.loadHalfWord(rnValue) & 0x0000FFFF);
+                    cpu.setRegister(rdIndex, cpu.loadHalfWordUnsigned(rnValue));
                     break;
                 case 0x00000040: // LDR{cond}SB Rd, <Address>
                     cpu.setRegister(rdIndex, memory.loadByte(rnValue));
                     break;
                 case 0x00000060: // LDR{cond}SH Rd, <Address>
-                    cpu.setRegister(rdIndex, memory.loadHalfWord(rnValue));
+                    cpu.setRegister(rdIndex, cpu.loadHalfWordSigned(rnValue));
                     break;
                 default:
                     return;

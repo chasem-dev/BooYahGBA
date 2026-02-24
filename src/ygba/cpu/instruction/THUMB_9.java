@@ -18,7 +18,7 @@ public final class THUMB_9 {
                 break;
                 
             case 0x0800: // LDR Rd, [Rb, #nn]
-                cpu.setRegister(rdIndex, memory.loadWord(rbValue + (offset << 2)));
+                cpu.setRegister(rdIndex, cpu.loadWordRotate(rbValue + (offset << 2)));
                 break;
                 
             case 0x1000: // STRB Rd, [Rb, #nn]

@@ -21,11 +21,11 @@ public final class THUMB_8 {
                 break;
                 
             case 0x0800: // LDRH Rd, [Rb, Ro]
-                cpu.setRegister(rdIndex, memory.loadHalfWord(offset) & 0x0000FFFF);
+                cpu.setRegister(rdIndex, cpu.loadHalfWordUnsigned(offset));
                 break;
                 
             case 0x0C00: // LDSH Rd, [Rb, Ro]
-                cpu.setRegister(rdIndex, memory.loadHalfWord(offset));
+                cpu.setRegister(rdIndex, cpu.loadHalfWordSigned(offset));
                 break;
                 
             default: // Unknown

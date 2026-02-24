@@ -13,13 +13,14 @@ public final class ARM_12 {
         int rmIndex = opcode & 0x0000000F;
         int rmValue = cpu.getRegister(rmIndex);
         int rdIndex = (opcode >>> 12) & 0x0000000F;
-        
-        int value = memory.loadWord(rnValue);
+
         if ((opcode & 0x00400000) == 0) { // Swap word quantity
+            int value = cpu.loadWordRotate(rnValue);
             cpu.setRegister(rdIndex, value);
             memory.storeWord(rnValue, rmValue);
         } else { // Swap byte quantity
-            cpu.setRegister(rdIndex, value & 0x000000FF);
+            int value = memory.loadByte(rnValue) & 0x000000FF;
+            cpu.setRegister(rdIndex, value);
             memory.storeByte(rnValue, (byte) rmValue);
         }
     }

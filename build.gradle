@@ -1,0 +1,158 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'ygba'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'ISO-8859-1'
+}
+
+application {
+    mainClass = 'ygba.ui.YGBAFrame'
+}
+
+def forwardedYgbaSystemProperties = System.properties.findAll { key, value ->
+    key.toString().startsWith('ygba.')
+}.collectEntries { key, value ->
+    [(key.toString()): value == null ? '' : value.toString()]
+}
+
+tasks.withType(JavaExec).configureEach {
+    if (!forwardedYgbaSystemProperties.isEmpty()) {
+        systemProperties forwardedYgbaSystemProperties
+    }
+}
+
+tasks.named('run', JavaExec).configure {
+    if (project.hasProperty('bios')) {
+        args '--bios', project.property('bios').toString()
+    }
+    if (project.hasProperty('rom')) {
+        args '--rom', project.property('rom').toString()
+    }
+    if (project.hasProperty('debugger')) {
+        args '--debugger'
+    }
+    if (project.hasProperty('debugConsole')) {
+        args '--debug-console'
+    }
+    if (project.hasProperty('statusLog')) {
+        args '--status-log'
+    }
+    if (project.hasProperty('traceVideo')) {
+        args '--trace-video'
+    }
+    if (project.hasProperty('logFile')) {
+        args '--log-file', project.property('logFile').toString()
+    }
+    standardInput = System.in
+}
+
+tasks.register('runDebug', JavaExec) {
+    group = 'application'
+    description = 'Run YahGBA with debug console/status logs (no debugger dialog)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+
+    args '--debug-console', '--status-log'
+    if (project.hasProperty('bios')) {
+        args '--bios', project.property('bios').toString()
+    }
+    if (project.hasProperty('rom')) {
+        args '--rom', project.property('rom').toString()
+    }
+    if (project.hasProperty('traceVideo')) {
+        args '--trace-video'
+    }
+    if (project.hasProperty('logFile')) {
+        args '--log-file', project.property('logFile').toString()
+    } else {
+        args '--log-file', "${project.layout.buildDirectory.get().asFile}/logs/ygba-debug.log"
+    }
+    standardInput = System.in
+}
+
+tasks.register('runDebugger', JavaExec) {
+    group = 'application'
+    description = 'Run YahGBA with debugger dialog + debug console/status logs'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+
+    args '--debugger', '--debug-console', '--status-log'
+    if (project.hasProperty('bios')) {
+        args '--bios', project.property('bios').toString()
+    }
+    if (project.hasProperty('rom')) {
+        args '--rom', project.property('rom').toString()
+    }
+    if (project.hasProperty('traceVideo')) {
+        args '--trace-video'
+    }
+    if (project.hasProperty('logFile')) {
+        args '--log-file', project.property('logFile').toString()
+    } else {
+        args '--log-file', "${project.layout.buildDirectory.get().asFile}/logs/ygba-debug.log"
+    }
+    standardInput = System.in
+}
+
+tasks.register('runDebugFresh') {
+    group = 'application'
+    description = 'Clean rebuild, then run debug mode'
+    dependsOn 'clean', 'runDebug'
+}
+
+tasks.register('runDebuggerFresh') {
+    group = 'application'
+    description = 'Clean rebuild, then run debugger mode'
+    dependsOn 'clean', 'runDebugger'
+}
+
+tasks.register('captureDumps', JavaExec) {
+    group = 'application'
+    description = 'Clear dumps and auto-capture frame/state dumps every 250ms for 30s'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+
+    doFirst {
+        delete "${project.projectDir}/dumps"
+        mkdir "${project.projectDir}/dumps"
+        mkdir "${project.layout.buildDirectory.get().asFile}/logs"
+    }
+
+    if (project.hasProperty('bios')) {
+        args '--bios', project.property('bios').toString()
+    }
+    if (project.hasProperty('rom')) {
+        args '--rom', project.property('rom').toString()
+    }
+
+    args '--status-log', '--trace-video'
+    args '--auto-dump-interval-ms', (project.findProperty('dumpIntervalMs') ?: '250').toString()
+    args '--auto-dump-duration-ms', (project.findProperty('dumpDurationMs') ?: '30000').toString()
+    args '--auto-dump-exit'
+
+    if (project.hasProperty('logFile')) {
+        args '--log-file', project.property('logFile').toString()
+    } else {
+        args '--log-file', "${project.layout.buildDirectory.get().asFile}/logs/ygba-capture.log"
+    }
+
+    standardInput = System.in
+}

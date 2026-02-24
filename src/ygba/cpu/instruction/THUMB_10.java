@@ -15,7 +15,7 @@ public final class THUMB_10 {
         if ((opcode & 0x0800) == 0) { // STRH Rd, [Rb, #nn]
             memory.storeHalfWord(rbValue + offset, (short) cpu.getRegister(rdIndex));
         } else { // LDRH Rd, [Rb, #nn]
-            cpu.setRegister(rdIndex, memory.loadHalfWord(rbValue + offset) & 0x0000FFFF);
+            cpu.setRegister(rdIndex, cpu.loadHalfWordUnsigned(rbValue + offset));
         }
     }
     

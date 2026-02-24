@@ -7,6 +7,15 @@ public final class ObjectMemory
     public ObjectMemory() {
         super("Object RAM", 0x400);
     }
+
+    public byte loadByte(int offset) {
+        offset = getInternalOffset(offset);
+        return space[offset];
+    }
+
+    // On GBA hardware, 8-bit writes to OAM are ignored.
+    public void storeByte(int offset, byte value) {
+    }
     
     
     public int getPriority(int objNumber) {
@@ -133,7 +142,21 @@ public final class ObjectMemory
         int objAttributesAddress = (objNumber << 3);
         return ((space[objAttributesAddress + 1] & 0x02) == 0);
     }
-    
+
+    // OBJ mode bits (attr0 bits 10-11): 0=normal, 1=semi-transparent, 2=obj window
+    public int getOBJMode(int objNumber) {
+        int objAttributesAddress = (objNumber << 3);
+        return ((space[objAttributesAddress + 1] >>> 2) & 0x03);
+    }
+
+    public boolean isOBJMode1(int objNumber) {
+        return (getOBJMode(objNumber) == 1);
+    }
+
+    public boolean isOBJWindowMode(int objNumber) {
+        return (getOBJMode(objNumber) == 2);
+    }
+
     public boolean isHFlipEnabled(int objNumber) {
         int objAttributesAddress = (objNumber << 3);
         return ((space[objAttributesAddress + 3] & 0x10) != 0);

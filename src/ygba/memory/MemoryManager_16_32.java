@@ -9,18 +9,18 @@ abstract class MemoryManager_16_32
     }
     
     
-    public final byte loadByte(int offset) {
+    public byte loadByte(int offset) {
         offset = getInternalOffset(offset) & 0xFFFFFFFE;
         return space[offset];
     }
     
-    public final short loadHalfWord(int offset) {
+    public short loadHalfWord(int offset) {
         offset = getInternalOffset(offset) & 0xFFFFFFFE;
         return (short) ((space[offset] & 0x00FF) |
                         (space[offset + 1] << 8));
     }
     
-    public final int loadWord(int offset) {
+    public int loadWord(int offset) {
         offset = getInternalOffset(offset) & 0xFFFFFFFC;
         return (((space[offset] & 0x000000FF)) |
                 ((space[offset + 1] & 0x000000FF) << 8) |
@@ -29,18 +29,18 @@ abstract class MemoryManager_16_32
     }
     
     
-    public final void storeByte(int offset, byte value) {
+    public void storeByte(int offset, byte value) {
         offset = getInternalOffset(offset) & 0xFFFFFFFE;
         space[offset] = space[offset + 1] = value;
     }
     
-    public final void storeHalfWord(int offset, short value) {
+    public void storeHalfWord(int offset, short value) {
         offset = getInternalOffset(offset) & 0xFFFFFFFE;
         space[offset] = (byte) value;
         space[offset + 1] = (byte) (value >>> 8);
     }
     
-    public final void storeWord(int offset, int value) {
+    public void storeWord(int offset, int value) {
         offset = getInternalOffset(offset) & 0xFFFFFFFC;
         space[offset] = (byte) value;
         space[offset + 1] = (byte) (value >>> 8);

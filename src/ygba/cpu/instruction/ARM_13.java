@@ -9,7 +9,7 @@ public final class ARM_13 {
     public static void execute(ARM7TDMI cpu, MemoryInterface memory, int opcode) {
         if (!ARMState.isPreconditionSatisfied(cpu, opcode)) return;
         
-        cpu.generateSoftwareInterrupt(cpu.getCurrentPC());
+        cpu.generateSoftwareInterrupt(cpu.getCurrentPC(), opcode & 0x00FFFFFF);
     }
     
     

@@ -115,6 +115,8 @@ public final class ARM7TDMI {
     private int pipelineStage1, pipelineStage2;
     
     private MemoryInterface memory;
+    private final boolean useHLESWI;
+    private final boolean traceSWI;
     
     
     public ARM7TDMI() {
@@ -123,10 +125,37 @@ public final class ARM7TDMI {
         // Initialiser les tables de décodage
         initTHUMB();
         initARM();
+        useHLESWI = !"false".equalsIgnoreCase(System.getProperty("ygba.hle.swi", "false"));
+        traceSWI = Boolean.getBoolean("ygba.trace.swi");
     }
     
     public void connectToMemory(MemoryInterface memory) {
         this.memory = memory;
+    }
+
+    // ARM7TDMI unaligned load semantics for single data transfer instructions.
+    public int loadWordRotate(int address) {
+        int alignedAddress = address & 0xFFFFFFFC;
+        int value = memory.loadWord(alignedAddress);
+        int rotate = (address & 0x00000003) << 3;
+        if (rotate == 0) return value;
+        return (value >>> rotate) | (value << (32 - rotate));
+    }
+
+    public int loadHalfWordUnsigned(int address) {
+        int alignedAddress = address & 0xFFFFFFFE;
+        int value = memory.loadHalfWord(alignedAddress) & 0x0000FFFF;
+        if ((address & 0x00000001) != 0) {
+            value = ((value >>> 8) | (value << 8)) & 0x0000FFFF;
+        }
+        return value;
+    }
+
+    public int loadHalfWordSigned(int address) {
+        if ((address & 0x00000001) != 0) {
+            return memory.loadByte(address);
+        }
+        return memory.loadHalfWord(address);
     }
     
     // ----- Gestion des registres -----
@@ -342,8 +371,148 @@ public final class ARM7TDMI {
         generateInterrupt(IRQMode, NormalInterruptVector, pcValue);
     }
     
-    public void generateSoftwareInterrupt(int pcValue) {
+    public void generateSoftwareInterrupt(int pcValue, int comment) {
+        int swi = comment & 0xFF;
+        if (useHLESWI && handleSoftwareInterruptHLE(swi)) {
+            if (traceSWI) {
+                System.out.printf("[SWI-HLE] id=%02X pc=%08X r0=%08X r1=%08X r2=%08X%n",
+                        swi, pcValue, getRegister(R0), getRegister(R1), getRegister(R2));
+            }
+            return;
+        }
+
+        if (traceSWI) {
+            System.out.printf("[SWI] id=%02X pc=%08X r0=%08X r1=%08X r2=%08X%n",
+                    swi, pcValue, getRegister(R0), getRegister(R1), getRegister(R2));
+        }
         generateInterrupt(SVCMode, SoftwareInterruptVector, pcValue);
+    }
+
+    public void generateSoftwareInterrupt(int pcValue) {
+        generateSoftwareInterrupt(pcValue, 0);
+    }
+
+    private boolean handleSoftwareInterruptHLE(int swi) {
+        switch (swi) {
+            case 0x0B:
+                hleCpuSet();
+                return true;
+            case 0x0C:
+                hleCpuFastSet();
+                return true;
+            case 0x11:
+                hleLZ77UnComp(false);
+                return true;
+            case 0x12:
+                hleLZ77UnComp(true);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void hleCpuSet() {
+        int source = getRegister(R0);
+        int destination = getRegister(R1);
+        int control = getRegister(R2);
+
+        int count = control & 0x001FFFFF;
+        if (count <= 0) return;
+
+        boolean fixedSource = ((control & 0x01000000) != 0);
+        boolean is32Bit = ((control & 0x04000000) != 0);
+
+        if (is32Bit) {
+            source &= 0xFFFFFFFC;
+            destination &= 0xFFFFFFFC;
+            int fixedValue = memory.loadWord(source);
+            for (int i = 0; i < count; i++) {
+                int value = fixedSource ? fixedValue : memory.loadWord(source);
+                memory.storeWord(destination, value);
+                destination += 4;
+                if (!fixedSource) source += 4;
+            }
+        } else {
+            source &= 0xFFFFFFFE;
+            destination &= 0xFFFFFFFE;
+            short fixedValue = memory.loadHalfWord(source);
+            for (int i = 0; i < count; i++) {
+                short value = fixedSource ? fixedValue : memory.loadHalfWord(source);
+                memory.storeHalfWord(destination, value);
+                destination += 2;
+                if (!fixedSource) source += 2;
+            }
+        }
+    }
+
+    private void hleCpuFastSet() {
+        int source = getRegister(R0) & 0xFFFFFFFC;
+        int destination = getRegister(R1) & 0xFFFFFFFC;
+        int control = getRegister(R2);
+
+        int count = control & 0x001FFFFF;
+        if (count <= 0) return;
+
+        int words = count << 3;
+        boolean fixedSource = ((control & 0x01000000) != 0);
+
+        int fixedValue = memory.loadWord(source);
+        for (int i = 0; i < words; i++) {
+            int value = fixedSource ? fixedValue : memory.loadWord(source);
+            memory.storeWord(destination, value);
+            destination += 4;
+            if (!fixedSource) source += 4;
+        }
+    }
+
+    private void hleLZ77UnComp(boolean toVRAM) {
+        int sourceAddress = getRegister(R0);
+        int destinationAddress = getRegister(R1);
+
+        int header = memory.loadWord(sourceAddress);
+        if ((header & 0xFF) != 0x10) return;
+
+        int outputSize = (header >>> 8);
+        if (outputSize <= 0) return;
+
+        byte[] output = new byte[outputSize];
+        int src = sourceAddress + 4;
+        int outPos = 0;
+
+        while (outPos < outputSize) {
+            int flags = memory.loadByte(src++) & 0xFF;
+            for (int bit = 7; bit >= 0 && outPos < outputSize; bit--) {
+                if ((flags & (1 << bit)) == 0) {
+                    output[outPos++] = memory.loadByte(src++);
+                } else {
+                    int b1 = memory.loadByte(src++) & 0xFF;
+                    int b2 = memory.loadByte(src++) & 0xFF;
+                    int length = (b1 >>> 4) + 3;
+                    int displacement = ((b1 & 0x0F) << 8) | b2;
+                    int copyPos = outPos - displacement - 1;
+                    for (int i = 0; i < length && outPos < outputSize; i++) {
+                        byte value = (copyPos >= 0 && copyPos < outPos) ? output[copyPos] : 0;
+                        output[outPos++] = value;
+                        copyPos++;
+                    }
+                }
+            }
+        }
+
+        if (toVRAM) {
+            int dst = destinationAddress & 0xFFFFFFFE;
+            for (int i = 0; i < outputSize; i += 2) {
+                int lo = output[i] & 0xFF;
+                int hi = ((i + 1) < outputSize) ? (output[i + 1] & 0xFF) : 0;
+                memory.storeHalfWord(dst, (short) (lo | (hi << 8)));
+                dst += 2;
+            }
+        } else {
+            int dst = destinationAddress;
+            for (int i = 0; i < outputSize; i++) {
+                memory.storeByte(dst + i, output[i]);
+            }
+        }
     }
     
     public void generateUndefinedInstructionInterrupt(int pcValue) {
@@ -380,6 +549,7 @@ public final class ARM7TDMI {
     
     public void run(int cycles) {
         while (cycles > 0) {
+            ygba.util.MemoryWriteWatch.clearCPUContext();
             if (!iFlag &&
                 (memory.getByte(IMEAddress) != 0) &&
                 ((memory.getHalfWord(IEAddress) & memory.getHalfWord(IFAddress)) != 0)) {
@@ -390,11 +560,15 @@ public final class ARM7TDMI {
                 if (tFlag) { // THUMB state
                     opcode = fetchTHUMB();
                     instruction = decodeTHUMB(opcode);
+                    ygba.util.MemoryWriteWatch.setCPUContext(getCurrentPC(), true, opcode);
                     executeTHUMB(opcode, instruction);
+                    ygba.util.MemoryWriteWatch.clearCPUContext();
                 } else { // ARM state
                     opcode = fetchARM();
                     instruction = decodeARM(opcode);
+                    ygba.util.MemoryWriteWatch.setCPUContext(getCurrentPC(), false, opcode);
                     executeARM(opcode, instruction);
+                    ygba.util.MemoryWriteWatch.clearCPUContext();
                 }
             }
             cycles -= CyclesPerInstruction;

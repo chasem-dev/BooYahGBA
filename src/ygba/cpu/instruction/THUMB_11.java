@@ -14,7 +14,7 @@ public final class THUMB_11 {
         if ((opcode & 0x0800) == 0) { // STR Rd, [SP, #nn]
             memory.storeWord(spValue + offset, cpu.getRegister(rdIndex));
         } else { // LDR Rd, [SP, #nn]
-            cpu.setRegister(rdIndex, memory.loadWord(spValue + offset));
+            cpu.setRegister(rdIndex, cpu.loadWordRotate(spValue + offset));
         }
     }
     

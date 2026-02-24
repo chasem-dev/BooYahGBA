@@ -8,7 +8,7 @@ public final class THUMB_17 {
     
     public static void execute(ARM7TDMI cpu, MemoryInterface memory, int opcode) {
         // SWI nn
-        cpu.generateSoftwareInterrupt(cpu.getCurrentPC());
+        cpu.generateSoftwareInterrupt(cpu.getCurrentPC(), opcode & 0x00FF);
     }
     
     

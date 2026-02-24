@@ -131,8 +131,6 @@ public final class ARM_5 {
                             } else {
                                 cFlag = ((operand2 & 0x80000000) != 0);
                             }
-                        } else {
-                            cFlag = ((operand2 & 0x80000000) != 0);
                         }
                         break;
                 }
@@ -174,23 +172,41 @@ public final class ARM_5 {
                 if (sBit) cpu.setVCFlagsForADD(operand1, operand2, rdValue);
                 break;
                 
-            case 0x00A00000: // ADC{cond}{S} Rd, Rn, Op2
-                rdValue = operand1 + operand2 + (cpu.getCFlag() ? 1 : 0);
+            case 0x00A00000: { // ADC{cond}{S} Rd, Rn, Op2
+                int carry = cpu.getCFlag() ? 1 : 0;
+                long longResult = (operand1 & 0xFFFFFFFFL) + (operand2 & 0xFFFFFFFFL) + carry;
+                rdValue = (int) longResult;
                 cpu.setRegister(rdIndex, rdValue);
-                if (sBit) cpu.setVCFlagsForADD(operand1, operand2, rdValue);
+                if (sBit) {
+                    cpu.setCFlag(longResult > 0xFFFFFFFFL);
+                    cpu.setVFlag(((operand1 ^ rdValue) & (operand2 ^ rdValue)) < 0);
+                }
                 break;
+            }
                 
-            case 0x00C00000: // SBC{cond}{S} Rd, Rn, Op2
-                rdValue = operand1 - operand2 - (cpu.getCFlag() ? 0 : 1);
+            case 0x00C00000: { // SBC{cond}{S} Rd, Rn, Op2
+                int borrow = cpu.getCFlag() ? 0 : 1;
+                long longResult = (operand1 & 0xFFFFFFFFL) - (operand2 & 0xFFFFFFFFL) - borrow;
+                rdValue = (int) longResult;
                 cpu.setRegister(rdIndex, rdValue);
-                if (sBit) cpu.setVCFlagsForSUB(operand1, operand2, rdValue);
+                if (sBit) {
+                    cpu.setCFlag(longResult >= 0);
+                    cpu.setVFlag(((operand1 ^ operand2) & (operand1 ^ rdValue)) < 0);
+                }
                 break;
+            }
                 
-            case 0x00E00000: // RSC{cond}{S} Rd, Rn, Op2
-                rdValue = operand2 - operand1 - (cpu.getCFlag() ? 0 : 1);
+            case 0x00E00000: { // RSC{cond}{S} Rd, Rn, Op2
+                int borrow = cpu.getCFlag() ? 0 : 1;
+                long longResult = (operand2 & 0xFFFFFFFFL) - (operand1 & 0xFFFFFFFFL) - borrow;
+                rdValue = (int) longResult;
                 cpu.setRegister(rdIndex, rdValue);
-                if (sBit) cpu.setVCFlagsForSUB(operand2, operand1, rdValue);
+                if (sBit) {
+                    cpu.setCFlag(longResult >= 0);
+                    cpu.setVFlag(((operand2 ^ operand1) & (operand2 ^ rdValue)) < 0);
+                }
                 break;
+            }
                 
             case 0x01000000: // TST{cond} Rn, Op2
                 rdValue = operand1 & operand2;

@@ -10,7 +10,7 @@ public final class THUMB_6 {
         // LDR Rd, [PC, #nn]
         int rdIndex = (opcode >>> 8) & 0x0007;
         int offset = (cpu.getPC() & 0xFFFFFFFC) + ((opcode & 0x00FF) << 2);
-        cpu.setRegister(rdIndex, memory.loadWord(offset));
+        cpu.setRegister(rdIndex, cpu.loadWordRotate(offset));
     }
     
     

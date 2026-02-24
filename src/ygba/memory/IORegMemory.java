@@ -7,6 +7,7 @@ import ygba.time.Time;
 import ygba.time.Timer;
 
 import java.awt.event.KeyEvent;
+import java.util.Arrays;
 
 public final class IORegMemory
         extends MemoryManager_8_16_32 {
@@ -95,6 +96,9 @@ public final class IORegMemory
             REG_HALTCNT = 0x0300; // Power-down control
     
     private short keyInput;
+    private final boolean traceVideoRegs;
+    private final boolean traceVideoAllWrites;
+    private final int[] traceVideoLastValues;
     
     private DMA dma0, dma1, dma2, dma3;
     private GFX gfx;
@@ -103,6 +107,10 @@ public final class IORegMemory
     
     public IORegMemory() {
         super("I/O Registers RAM", 0x400);
+        traceVideoRegs = Boolean.getBoolean("ygba.trace.video");
+        traceVideoAllWrites = Boolean.getBoolean("ygba.trace.video.all-writes");
+        traceVideoLastValues = new int[12];
+        Arrays.fill(traceVideoLastValues, -1);
     }
     
     void connectToDMA(DirectMemoryAccess dma) {
@@ -271,20 +279,77 @@ public final class IORegMemory
         }
         
         space[offset] = value;
+        if (traceVideoRegs && !isOffsetAligned) traceVideoRegisterWrite(offset16);
     }
     
     public void storeHalfWord(int offset, short value) {
-        offset &= 0xFFFFFFFE;
-        storeByte(offset, (byte) value);
-        storeByte(offset + 1, (byte) (value >>> 8));
+        offset = getInternalOffset(offset) & 0xFFFFFFFE;
+
+        switch (offset) {
+            // VCOUNT
+            case REG_VCOUNT:
+                return;
+
+            // DMA0
+            case REG_DMA0SAD:   dma0.setSourceLRegister(value); break;
+            case REG_DMA0SAD+2: dma0.setSourceHRegister(value); break;
+            case REG_DMA0DAD:   dma0.setDestinationLRegister(value); break;
+            case REG_DMA0DAD+2: dma0.setDestinationHRegister(value); break;
+            case REG_DMA0CNT_L: dma0.setCountRegister(value); break;
+            case REG_DMA0CNT_H: dma0.setControlRegister(value); break;
+
+            // DMA1
+            case REG_DMA1SAD:   dma1.setSourceLRegister(value); break;
+            case REG_DMA1SAD+2: dma1.setSourceHRegister(value); break;
+            case REG_DMA1DAD:   dma1.setDestinationLRegister(value); break;
+            case REG_DMA1DAD+2: dma1.setDestinationHRegister(value); break;
+            case REG_DMA1CNT_L: dma1.setCountRegister(value); break;
+            case REG_DMA1CNT_H: dma1.setControlRegister(value); break;
+
+            // DMA2
+            case REG_DMA2SAD:   dma2.setSourceLRegister(value); break;
+            case REG_DMA2SAD+2: dma2.setSourceHRegister(value); break;
+            case REG_DMA2DAD:   dma2.setDestinationLRegister(value); break;
+            case REG_DMA2DAD+2: dma2.setDestinationHRegister(value); break;
+            case REG_DMA2CNT_L: dma2.setCountRegister(value); break;
+            case REG_DMA2CNT_H: dma2.setControlRegister(value); break;
+
+            // DMA3
+            case REG_DMA3SAD:   dma3.setSourceLRegister(value); break;
+            case REG_DMA3SAD+2: dma3.setSourceHRegister(value); break;
+            case REG_DMA3DAD:   dma3.setDestinationLRegister(value); break;
+            case REG_DMA3DAD+2: dma3.setDestinationHRegister(value); break;
+            case REG_DMA3CNT_L: dma3.setCountRegister(value); break;
+            case REG_DMA3CNT_H: dma3.setControlRegister(value); break;
+
+            // Timers
+            case REG_TM0D:   timer0.setTime(value); break;
+            case REG_TM0CNT: timer0.updateState(value); break;
+            case REG_TM1D:   timer1.setTime(value); break;
+            case REG_TM1CNT: timer1.updateState(value); break;
+            case REG_TM2D:   timer2.setTime(value); break;
+            case REG_TM2CNT: timer2.updateState(value); break;
+            case REG_TM3D:   timer3.setTime(value); break;
+            case REG_TM3CNT: timer3.updateState(value); break;
+
+            // Keypad
+            case REG_P1:
+                return;
+
+            // Interrupts
+            case REG_IF:
+                setHalfWord(REG_IF, (short) (getHalfWord(REG_IF) & ~value));
+                return;
+        }
+
+        setHalfWord(offset, value);
+        if (traceVideoRegs) traceVideoRegisterWrite(offset);
     }
     
     public void storeWord(int offset, int value) {
         offset &= 0xFFFFFFFC;
-        storeByte(offset, (byte) value);
-        storeByte(offset + 1, (byte) (value >>> 8));
-        storeByte(offset + 2, (byte) (value >>> 16));
-        storeByte(offset + 3, (byte) (value >>> 24));
+        storeHalfWord(offset, (short) value);
+        storeHalfWord(offset + 2, (short) (value >>> 16));
     }
     
     public void softReset() {
@@ -418,6 +483,14 @@ public final class IORegMemory
         else value &= ~0x02;
         setByte(REG_DISPSTAT, value);
     }
+
+    public boolean isVBlankInterruptEnabled() {
+        return ((getByte(REG_DISPSTAT) & 0x08) != 0);
+    }
+
+    public boolean isHBlankInterruptEnabled() {
+        return ((getByte(REG_DISPSTAT) & 0x10) != 0);
+    }
     
     public boolean isVCounterMatchInterruptEnabled() {
         return ((getByte(REG_DISPSTAT) & 0x20) != 0);
@@ -435,6 +508,11 @@ public final class IORegMemory
     
     public void setCurrentScanline(int scanline) {
         setByte(REG_VCOUNT, (byte) scanline);
+
+        byte dispstat = getByte(REG_DISPSTAT);
+        if ((scanline & 0xFF) == getVCountSetting()) dispstat |= 0x04;
+        else dispstat &= ~0x04;
+        setByte(REG_DISPSTAT, dispstat);
     }
     
     // ----- BGxCNT
@@ -537,6 +615,119 @@ public final class IORegMemory
         return (((getByte(REG_MOSAIC + 1) >>> 4) & 0x0F) + 1);
     }
     
+    // ----- BLDMOD (Color Special Effects)
+
+    public int getBlendMode() {
+        return ((getByte(REG_BLDMOD) >>> 6) & 0x03);
+    }
+
+    public boolean isFirstTarget(int layer) {
+        return ((getByte(REG_BLDMOD) & (1 << layer)) != 0);
+    }
+
+    public boolean isFirstTargetBD() {
+        return ((getByte(REG_BLDMOD) & 0x20) != 0);
+    }
+
+    public boolean isSecondTarget(int layer) {
+        return ((getByte(REG_BLDMOD + 1) & (1 << layer)) != 0);
+    }
+
+    public boolean isSecondTargetBD() {
+        return ((getByte(REG_BLDMOD + 1) & 0x20) != 0);
+    }
+
+    // ----- COLEV (Alpha Blending Coefficients)
+
+    public int getEVA() {
+        int eva = getByte(REG_COLEV) & 0x1F;
+        return (eva > 16) ? 16 : eva;
+    }
+
+    public int getEVB() {
+        int evb = getByte(REG_COLEV + 1) & 0x1F;
+        return (evb > 16) ? 16 : evb;
+    }
+
+    // ----- COLY (Brightness Coefficient)
+
+    public int getEVY() {
+        int evy = getByte(REG_COLY) & 0x1F;
+        return (evy > 16) ? 16 : evy;
+    }
+
+    // ----- Window Registers
+
+    public int getWin0Left() {
+        return (getByte(REG_WIN0H + 1) & 0xFF);
+    }
+
+    public int getWin0Right() {
+        return (getByte(REG_WIN0H) & 0xFF);
+    }
+
+    public int getWin1Left() {
+        return (getByte(REG_WIN1H + 1) & 0xFF);
+    }
+
+    public int getWin1Right() {
+        return (getByte(REG_WIN1H) & 0xFF);
+    }
+
+    public int getWin0Top() {
+        return (getByte(REG_WIN0V + 1) & 0xFF);
+    }
+
+    public int getWin0Bottom() {
+        return (getByte(REG_WIN0V) & 0xFF);
+    }
+
+    public int getWin1Top() {
+        return (getByte(REG_WIN1V + 1) & 0xFF);
+    }
+
+    public int getWin1Bottom() {
+        return (getByte(REG_WIN1V) & 0xFF);
+    }
+
+    public int getWinInside(int winNum) {
+        return (getByte(REG_WININ + winNum) & 0x3F);
+    }
+
+    public int getWinOutside() {
+        return (getByte(REG_WINOUT) & 0x3F);
+    }
+
+    public int getWinOBJ() {
+        return (getByte(REG_WINOUT + 1) & 0x3F);
+    }
+
+    private void traceVideoRegisterWrite(int offset16) {
+        String regName;
+        int regIndex;
+        switch (offset16) {
+            case REG_DISPCNT: regName = "DISPCNT"; regIndex = 0; break;
+            case REG_DISPSTAT: regName = "DISPSTAT"; regIndex = 1; break;
+            case REG_BG0CNT: regName = "BG0CNT"; regIndex = 2; break;
+            case REG_BG1CNT: regName = "BG1CNT"; regIndex = 3; break;
+            case REG_BG2CNT: regName = "BG2CNT"; regIndex = 4; break;
+            case REG_BG3CNT: regName = "BG3CNT"; regIndex = 5; break;
+            case REG_WININ: regName = "WININ"; regIndex = 6; break;
+            case REG_WINOUT: regName = "WINOUT"; regIndex = 7; break;
+            case REG_MOSAIC: regName = "MOSAIC"; regIndex = 8; break;
+            case REG_BLDMOD: regName = "BLDCNT"; regIndex = 9; break;
+            case REG_COLEV: regName = "BLDALPHA"; regIndex = 10; break;
+            case REG_COLY: regName = "BLDY"; regIndex = 11; break;
+            default: return;
+        }
+
+        int value = getHalfWord(offset16) & 0xFFFF;
+        if (!traceVideoAllWrites && traceVideoLastValues[regIndex] == value) return;
+        traceVideoLastValues[regIndex] = value;
+
+        System.out.printf("[VREG] %s=%04X%n", regName, value);
+    }
+
     // ----- Keypad
     
     private static short keyInput(int keyCode) {
@@ -544,6 +735,7 @@ public final class IORegMemory
             case KeyEvent.VK_X:          return 0x0001;
             case KeyEvent.VK_C:          return 0x0002;
             case KeyEvent.VK_BACK_SPACE: return 0x0004;
+            case KeyEvent.VK_SPACE:      return 0x0004;
             case KeyEvent.VK_ENTER:      return 0x0008;
             case KeyEvent.VK_RIGHT:      return 0x0010;
             case KeyEvent.VK_LEFT:       return 0x0020;
@@ -581,7 +773,7 @@ public final class IORegMemory
     }
     
     public void generateInterrupt(short interruptBit) {
-        setHalfWord(REG_IF, (short) (getHalfWord(REG_IF) | (getHalfWord(REG_IE) & interruptBit)));
+        setHalfWord(REG_IF, (short) (getHalfWord(REG_IF) | interruptBit));
     }
     
     
@@ -596,7 +788,7 @@ public final class IORegMemory
         dma1.signalHBlank();
         dma2.signalHBlank();
         dma3.signalHBlank();
-        generateInterrupt(HBlankInterruptBit);
+        if (isHBlankInterruptEnabled()) generateInterrupt(HBlankInterruptBit);
         setHBlankFlag(true);
         
         // Handle V-Counter Match interrupt
@@ -614,7 +806,7 @@ public final class IORegMemory
         dma1.signalVBlank();
         dma2.signalVBlank();
         dma3.signalVBlank();
-        generateInterrupt(VBlankInterruptBit);
+        if (isVBlankInterruptEnabled()) generateInterrupt(VBlankInterruptBit);
         setVBlankFlag(true);
     }
     

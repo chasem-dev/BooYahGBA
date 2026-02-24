@@ -4,6 +4,7 @@ import ygba.dma.DirectMemoryAccess;
 import ygba.gfx.GFX;
 import ygba.time.Time;
 import ygba.util.Hex;
+import ygba.util.MemoryWriteWatch;
 
 import java.io.*;
 import java.net.*;
@@ -22,6 +23,10 @@ public final class Memory
     private GamePakMemory gp1Mem, gp2Mem;
     
     private boolean isBIOSLoaded, isROMLoaded;
+
+    private String loadedBIOSSource, loadedROMSource;
+    private int loadedBIOSSize, loadedROMSize;
+    private long loadedBIOSCRC32, loadedROMCRC32;
     
     private long fileSize;
     
@@ -44,8 +49,14 @@ public final class Memory
         bank[0x08] = bank[0x0A] = bank[0x0C] = gp1Mem;
         bank[0x09] = bank[0x0B] = bank[0x0D] = gp2Mem;
         bank[0x0E] = bank[0x0F] = new SaveMemory();
+
+        ((VideoMemory) bank[0x06]).connectToIORegMemory((IORegMemory) bank[0x04]);
         
         isBIOSLoaded = isROMLoaded = false;
+
+        loadedBIOSSource = loadedROMSource = null;
+        loadedBIOSSize = loadedROMSize = 0;
+        loadedBIOSCRC32 = loadedROMCRC32 = 0;
         
         fileSize = 0;
     }
@@ -130,14 +141,17 @@ public final class Memory
     
     
     public void storeByte(int offset, byte value) {
+        MemoryWriteWatch.logWrite(offset, 1, value & 0xFF);
         bank[(offset & MemoryBankMask) >>> 24].storeByte(offset, value);
     }
     
     public void storeHalfWord(int offset, short value) {
+        MemoryWriteWatch.logWrite(offset, 2, value & 0xFFFF);
         bank[(offset & MemoryBankMask) >>> 24].storeHalfWord(offset, value);
     }
     
     public void storeWord(int offset, int value) {
+        MemoryWriteWatch.logWrite(offset, 4, value);
         bank[(offset & MemoryBankMask) >>> 24].storeWord(offset, value);
     }
     
@@ -205,6 +219,12 @@ public final class Memory
             bytesRead = stream.read(buffer, pos, size);
         } while ((bytesRead != -1) && (size > 0));
     }
+
+    private static long computeCRC32(byte[] data, int len) {
+        CRC32 crc32 = new CRC32();
+        crc32.update(data, 0, len);
+        return crc32.getValue();
+    }
     
     
     public boolean isBIOSLoaded() { return isBIOSLoaded; }
@@ -222,6 +242,9 @@ public final class Memory
             biosStream.close();
             
             isBIOSLoaded = true;
+            loadedBIOSSource = biosFileURL.toString();
+            loadedBIOSSize = biosFileSize;
+            loadedBIOSCRC32 = computeCRC32(sysMem.getSpace(), biosFileSize);
         } catch (IOException e) {
             System.out.println("Failed loading BIOS file: " + e.getMessage());
             unloadBIOS();
@@ -234,6 +257,9 @@ public final class Memory
         sysMem.hardReset();
         fileSize = 0;
         isBIOSLoaded = false;
+        loadedBIOSSource = null;
+        loadedBIOSSize = 0;
+        loadedBIOSCRC32 = 0;
     }
     
     
@@ -262,6 +288,13 @@ public final class Memory
             romStream.close();
             
             isROMLoaded = true;
+            loadedROMSource = romFileURL.toString();
+            loadedROMSize = romFileSize;
+
+            CRC32 crc32 = new CRC32();
+            if (rom1Size > 0) crc32.update(rom1, 0, rom1Size);
+            if (rom2Size > 0) crc32.update(rom2, 0, rom2Size);
+            loadedROMCRC32 = crc32.getValue();
         } catch (IOException e) {
             System.out.println("Failed loading ROM file: " + e.getMessage());
             unloadROM();
@@ -275,6 +308,33 @@ public final class Memory
         gp2Mem.createSpace(0x0);
         fileSize = 0;
         isROMLoaded = false;
+        loadedROMSource = null;
+        loadedROMSize = 0;
+        loadedROMCRC32 = 0;
+    }
+
+    public String getLoadedBIOSSource() {
+        return loadedBIOSSource;
+    }
+
+    public int getLoadedBIOSSize() {
+        return loadedBIOSSize;
+    }
+
+    public long getLoadedBIOSCRC32() {
+        return loadedBIOSCRC32;
+    }
+
+    public String getLoadedROMSource() {
+        return loadedROMSource;
+    }
+
+    public int getLoadedROMSize() {
+        return loadedROMSize;
+    }
+
+    public long getLoadedROMCRC32() {
+        return loadedROMCRC32;
     }
     
 }

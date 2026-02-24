@@ -68,7 +68,7 @@ public final class ARM_9 {
             }
         } else { // LDR{cond}{B}{T} Rd, <Address>
             if (isWordTransfer) {
-                cpu.setRegister(rdIndex, memory.loadWord(rnValue));
+                cpu.setRegister(rdIndex, cpu.loadWordRotate(rnValue));
             } else {
                 cpu.setRegister(rdIndex, memory.loadByte(rnValue) & 0x000000FF);
             }

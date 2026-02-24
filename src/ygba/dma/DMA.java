@@ -9,6 +9,40 @@ public abstract class DMA {
     short count, control;
     boolean isEnabled, isIRQEnabled, isRepeatEnabled;
     int startTiming;
+
+    private long triggerCount;
+    private long totalUnitsTransferred;
+    private long vramHalfWordUnits;
+    private long vramWordUnits;
+    private long ewramHalfWordUnits;
+    private long ewramWordUnits;
+    private int lastSourceStart;
+    private int lastSourceEnd;
+    private int lastDestinationStart;
+    private int lastDestinationEnd;
+    private int lastUnitCount;
+    private int lastSourceStep;
+    private int lastDestinationStep;
+    private boolean lastTransfer32Bit;
+    private boolean lastTransferTouchedVRAM;
+    private int lastVRAMControl;
+    private int lastVRAMSourceStart;
+    private int lastVRAMSourceEnd;
+    private int lastVRAMDestinationStart;
+    private int lastVRAMDestinationEnd;
+    private int lastVRAMUnitCount;
+    private int lastVRAMSourceStep;
+    private int lastVRAMDestinationStep;
+    private boolean lastVRAMTransfer32Bit;
+    private int lastEWRAMControl;
+    private int lastEWRAMSourceStart;
+    private int lastEWRAMSourceEnd;
+    private int lastEWRAMDestinationStart;
+    private int lastEWRAMDestinationEnd;
+    private int lastEWRAMUnitCount;
+    private int lastEWRAMSourceStep;
+    private int lastEWRAMDestinationStep;
+    private boolean lastEWRAMTransfer32Bit;
     
     private int dmaNumber;
     private int dmaMaxCount;
@@ -39,6 +73,39 @@ public abstract class DMA {
         count = control = 0;
         isEnabled = isIRQEnabled = isRepeatEnabled = false;
         startTiming = 0;
+        triggerCount = 0;
+        totalUnitsTransferred = 0;
+        vramHalfWordUnits = 0;
+        vramWordUnits = 0;
+        ewramHalfWordUnits = 0;
+        ewramWordUnits = 0;
+        lastSourceStart = 0;
+        lastSourceEnd = 0;
+        lastDestinationStart = 0;
+        lastDestinationEnd = 0;
+        lastUnitCount = 0;
+        lastSourceStep = 0;
+        lastDestinationStep = 0;
+        lastTransfer32Bit = false;
+        lastTransferTouchedVRAM = false;
+        lastVRAMControl = 0;
+        lastVRAMSourceStart = 0;
+        lastVRAMSourceEnd = 0;
+        lastVRAMDestinationStart = 0;
+        lastVRAMDestinationEnd = 0;
+        lastVRAMUnitCount = 0;
+        lastVRAMSourceStep = 0;
+        lastVRAMDestinationStep = 0;
+        lastVRAMTransfer32Bit = false;
+        lastEWRAMControl = 0;
+        lastEWRAMSourceStart = 0;
+        lastEWRAMSourceEnd = 0;
+        lastEWRAMDestinationStart = 0;
+        lastEWRAMDestinationEnd = 0;
+        lastEWRAMUnitCount = 0;
+        lastEWRAMSourceStep = 0;
+        lastEWRAMDestinationStep = 0;
+        lastEWRAMTransfer32Bit = false;
     }
     
     public final String getName() {
@@ -73,6 +140,10 @@ public abstract class DMA {
             boolean is32BitTransfer = ((control & 0x0400) != 0);
             int dmaTransferSize = (is32BitTransfer ? 4 : 2);
             int dmaCount = ((count == 0) ? dmaMaxCount : (count & 0x0000FFFF));
+            int sourceStart = source;
+            int destinationStart = destination;
+            boolean touchedVRAM = false;
+            boolean touchedEWRAM = false;
             
             int dstAdd, srcAdd;
             int dstControl = control & 0x0060;
@@ -95,16 +166,64 @@ public abstract class DMA {
             int old_destination = destination;
             if (is32BitTransfer) {
                 for (int i = 0; i < dmaCount; i++) {
+                    if ((destination & 0x0F000000) == 0x06000000) {
+                        vramWordUnits++;
+                        touchedVRAM = true;
+                    } else if ((destination & 0x0F000000) == 0x02000000) {
+                        ewramWordUnits++;
+                        touchedEWRAM = true;
+                    }
                     memory.storeWord(destination, memory.loadWord(source));
                     destination += dstAdd;
                     source += srcAdd;
                 }
             } else {
                 for (int i = 0; i < dmaCount; i++) {
+                    if ((destination & 0x0F000000) == 0x06000000) {
+                        vramHalfWordUnits++;
+                        touchedVRAM = true;
+                    } else if ((destination & 0x0F000000) == 0x02000000) {
+                        ewramHalfWordUnits++;
+                        touchedEWRAM = true;
+                    }
                     memory.storeHalfWord(destination, memory.loadHalfWord(source));
                     destination += dstAdd;
                     source += srcAdd;
                 }
+            }
+
+            triggerCount++;
+            totalUnitsTransferred += dmaCount;
+            lastSourceStart = sourceStart;
+            lastSourceEnd = source;
+            lastDestinationStart = destinationStart;
+            lastDestinationEnd = destination;
+            lastUnitCount = dmaCount;
+            lastSourceStep = srcAdd;
+            lastDestinationStep = dstAdd;
+            lastTransfer32Bit = is32BitTransfer;
+            lastTransferTouchedVRAM = touchedVRAM;
+            if (touchedVRAM) {
+                lastVRAMControl = control & 0xFFFF;
+                lastVRAMSourceStart = sourceStart;
+                lastVRAMSourceEnd = source;
+                lastVRAMDestinationStart = destinationStart;
+                lastVRAMDestinationEnd = destination;
+                lastVRAMUnitCount = dmaCount;
+                lastVRAMSourceStep = srcAdd;
+                lastVRAMDestinationStep = dstAdd;
+                lastVRAMTransfer32Bit = is32BitTransfer;
+            }
+            if (touchedEWRAM) {
+                lastEWRAMControl = control & 0xFFFF;
+                lastEWRAMSourceStart = sourceStart;
+                lastEWRAMSourceEnd = source;
+                lastEWRAMDestinationStart = destinationStart;
+                lastEWRAMDestinationEnd = destination;
+                lastEWRAMUnitCount = dmaCount;
+                lastEWRAMSourceStep = srcAdd;
+                lastEWRAMDestinationStep = dstAdd;
+                lastEWRAMTransfer32Bit = is32BitTransfer;
             }
             if (dstControl == 0x0060) destination = old_destination;
             
@@ -155,6 +274,138 @@ public abstract class DMA {
     
     public final short getControlRegister() {
         return control;
+    }
+
+    public final long getTriggerCount() {
+        return triggerCount;
+    }
+
+    public final long getTotalUnitsTransferred() {
+        return totalUnitsTransferred;
+    }
+
+    public final long getVRAMHalfWordUnits() {
+        return vramHalfWordUnits;
+    }
+
+    public final long getVRAMWordUnits() {
+        return vramWordUnits;
+    }
+
+    public final long getEWRAMHalfWordUnits() {
+        return ewramHalfWordUnits;
+    }
+
+    public final long getEWRAMWordUnits() {
+        return ewramWordUnits;
+    }
+
+    public final int getLastSourceStart() {
+        return lastSourceStart;
+    }
+
+    public final int getLastSourceEnd() {
+        return lastSourceEnd;
+    }
+
+    public final int getLastDestinationStart() {
+        return lastDestinationStart;
+    }
+
+    public final int getLastDestinationEnd() {
+        return lastDestinationEnd;
+    }
+
+    public final int getLastUnitCount() {
+        return lastUnitCount;
+    }
+
+    public final int getLastSourceStep() {
+        return lastSourceStep;
+    }
+
+    public final int getLastDestinationStep() {
+        return lastDestinationStep;
+    }
+
+    public final boolean wasLastTransfer32Bit() {
+        return lastTransfer32Bit;
+    }
+
+    public final boolean didLastTransferTouchVRAM() {
+        return lastTransferTouchedVRAM;
+    }
+
+    public final int getLastVRAMControl() {
+        return lastVRAMControl;
+    }
+
+    public final int getLastVRAMSourceStart() {
+        return lastVRAMSourceStart;
+    }
+
+    public final int getLastVRAMSourceEnd() {
+        return lastVRAMSourceEnd;
+    }
+
+    public final int getLastVRAMDestinationStart() {
+        return lastVRAMDestinationStart;
+    }
+
+    public final int getLastVRAMDestinationEnd() {
+        return lastVRAMDestinationEnd;
+    }
+
+    public final int getLastVRAMUnitCount() {
+        return lastVRAMUnitCount;
+    }
+
+    public final int getLastVRAMSourceStep() {
+        return lastVRAMSourceStep;
+    }
+
+    public final int getLastVRAMDestinationStep() {
+        return lastVRAMDestinationStep;
+    }
+
+    public final boolean wasLastVRAMTransfer32Bit() {
+        return lastVRAMTransfer32Bit;
+    }
+
+    public final int getLastEWRAMControl() {
+        return lastEWRAMControl;
+    }
+
+    public final int getLastEWRAMSourceStart() {
+        return lastEWRAMSourceStart;
+    }
+
+    public final int getLastEWRAMSourceEnd() {
+        return lastEWRAMSourceEnd;
+    }
+
+    public final int getLastEWRAMDestinationStart() {
+        return lastEWRAMDestinationStart;
+    }
+
+    public final int getLastEWRAMDestinationEnd() {
+        return lastEWRAMDestinationEnd;
+    }
+
+    public final int getLastEWRAMUnitCount() {
+        return lastEWRAMUnitCount;
+    }
+
+    public final int getLastEWRAMSourceStep() {
+        return lastEWRAMSourceStep;
+    }
+
+    public final int getLastEWRAMDestinationStep() {
+        return lastEWRAMDestinationStep;
+    }
+
+    public final boolean wasLastEWRAMTransfer32Bit() {
+        return lastEWRAMTransfer32Bit;
     }
     
 }

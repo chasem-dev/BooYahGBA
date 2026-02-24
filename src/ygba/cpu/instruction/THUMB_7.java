@@ -21,7 +21,7 @@ public final class THUMB_7 {
                 break;
                 
             case 0x0800: // LDR Rd, [Rb, Ro]
-                cpu.setRegister(rdIndex, memory.loadWord(offset));
+                cpu.setRegister(rdIndex, cpu.loadWordRotate(offset));
                 break;
                 
             case 0x0C00: // LDRB Rd, [Rb, Ro]

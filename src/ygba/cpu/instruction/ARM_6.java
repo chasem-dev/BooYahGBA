@@ -47,7 +47,7 @@ public final class ARM_6 {
                 if ((opcode & 0x00040000) != 0) psrValue = (psrValue & 0xFF00FFFF) | (operand & 0x00FF0000);
             }
             if ((opcode & 0x00080000) != 0) psrValue = (psrValue & 0x00FFFFFF) | (operand & 0xFF000000);
-            psrValue |= 0x00000010;
+            if ((opcode & 0x00010000) != 0) psrValue |= 0x00000010;
             
             if (psrIndex == cpu.CPSR) {
                 cpu.setPC(cpu.getCurrentPC());

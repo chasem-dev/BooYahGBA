@@ -9,6 +9,7 @@ public final class THUMB_4 {
         int rdIndex = opcode & 0x0007;
         int rsIndex = (opcode >>> 3) & 0x0007;
         int rsValue = cpu.getRegister(rsIndex);
+        int shiftAmountByte = rsValue & 0x000000FF;
         int rdOldValue = cpu.getRegister(rdIndex);
         int rdNewValue = rdOldValue;
         
@@ -24,11 +25,11 @@ public final class THUMB_4 {
                 break;
                 
             case 0x0080: // LSL Rd, Rs
-                if (rsValue != 0) {
-                    if (rsValue < 32) {
-                        cpu.setCFlag((rdOldValue & (1 << (32 - rsValue))) != 0);
-                        rdNewValue <<= rsValue;
-                    } else if (rsValue == 32) {
+                if (shiftAmountByte != 0) {
+                    if (shiftAmountByte < 32) {
+                        cpu.setCFlag((rdOldValue & (1 << (32 - shiftAmountByte))) != 0);
+                        rdNewValue <<= shiftAmountByte;
+                    } else if (shiftAmountByte == 32) {
                         cpu.setCFlag((rdOldValue & 0x00000001) != 0);
                         rdNewValue = 0;
                     } else {
@@ -40,11 +41,11 @@ public final class THUMB_4 {
                 break;
                 
             case 0x00C0: // LSR Rd, Rs
-                if (rsValue != 0) {
-                    if (rsValue < 32) {
-                        cpu.setCFlag((rdOldValue & (1 << (rsValue - 1))) != 0);
-                        rdNewValue >>>= rsValue;
-                    } else if (rsValue == 32) {
+                if (shiftAmountByte != 0) {
+                    if (shiftAmountByte < 32) {
+                        cpu.setCFlag((rdOldValue & (1 << (shiftAmountByte - 1))) != 0);
+                        rdNewValue >>>= shiftAmountByte;
+                    } else if (shiftAmountByte == 32) {
                         cpu.setCFlag((rdOldValue & 0x80000000) != 0);
                         rdNewValue = 0;
                     } else {
@@ -56,10 +57,10 @@ public final class THUMB_4 {
                 break;
                 
             case 0x0100: // ASR Rd, Rs
-                if (rsValue != 0) {
-                    if (rsValue < 32) {
-                        cpu.setCFlag((rdOldValue & (1 << (rsValue - 1))) != 0);
-                        rdNewValue >>= rsValue;
+                if (shiftAmountByte != 0) {
+                    if (shiftAmountByte < 32) {
+                        cpu.setCFlag((rdOldValue & (1 << (shiftAmountByte - 1))) != 0);
+                        rdNewValue >>= shiftAmountByte;
                     } else {
                         cpu.setCFlag((rdOldValue & 0x80000000) != 0);
                         rdNewValue >>= 31;
@@ -68,26 +69,34 @@ public final class THUMB_4 {
                 }
                 break;
                 
-            case 0x0140: // ADC Rd, Rs
-                rdNewValue = rdOldValue + rsValue + (cpu.getCFlag() ? 1 : 0);
-                cpu.setVCFlagsForADD(rdOldValue, rsValue, rdNewValue);
+            case 0x0140: { // ADC Rd, Rs
+                int carry = cpu.getCFlag() ? 1 : 0;
+                long longResult = (rdOldValue & 0xFFFFFFFFL) + (rsValue & 0xFFFFFFFFL) + carry;
+                rdNewValue = (int) longResult;
+                cpu.setCFlag(longResult > 0xFFFFFFFFL);
+                cpu.setVFlag(((rdOldValue ^ rdNewValue) & (rsValue ^ rdNewValue)) < 0);
                 cpu.setRegister(rdIndex, rdNewValue);
                 break;
-                
-            case 0x0180: // SBC Rd, Rs
-                rdNewValue = rdOldValue - rsValue - (cpu.getCFlag() ? 0 : 1);
-                cpu.setVCFlagsForSUB(rdOldValue, rsValue, rdNewValue);
+            }
+
+            case 0x0180: { // SBC Rd, Rs
+                int borrow = cpu.getCFlag() ? 0 : 1;
+                long longResult = (rdOldValue & 0xFFFFFFFFL) - (rsValue & 0xFFFFFFFFL) - borrow;
+                rdNewValue = (int) longResult;
+                cpu.setCFlag(longResult >= 0);
+                cpu.setVFlag(((rdOldValue ^ rsValue) & (rdOldValue ^ rdNewValue)) < 0);
                 cpu.setRegister(rdIndex, rdNewValue);
                 break;
+            }
                 
             case 0x01C0: // ROR Rd, Rs
-                if (rsValue != 0) {
-                    rsValue &= 0x0000001F;
-                    if (rsValue == 0) {
+                if (shiftAmountByte != 0) {
+                    int shiftAmount = shiftAmountByte & 0x0000001F;
+                    if (shiftAmount == 0) {
                         cpu.setCFlag((rdOldValue & 0x80000000) != 0);
                     } else {
-                        cpu.setCFlag((rdOldValue & (1 << (rsValue - 1))) != 0);
-                        rdNewValue = (rdOldValue << (32 - rsValue)) | (rdOldValue >>> rsValue);
+                        cpu.setCFlag((rdOldValue & (1 << (shiftAmount - 1))) != 0);
+                        rdNewValue = (rdOldValue << (32 - shiftAmount)) | (rdOldValue >>> shiftAmount);
                         cpu.setRegister(rdIndex, rdNewValue);
                     }
                 }
