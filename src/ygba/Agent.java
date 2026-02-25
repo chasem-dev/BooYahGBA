@@ -4,6 +4,7 @@ import ygba.cpu.ARM7TDMI;
 import ygba.gfx.GFX;
 import ygba.memory.IORegMemory;
 import ygba.memory.Memory;
+import ygba.memory.SavePersistence;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -44,8 +45,14 @@ public final class Agent {
         ygba.reset();
     }
 
+    public void setupSavePersistence(File saveDir, String romFileName) {
+        ygba.setupSavePersistence(saveDir, romFileName);
+    }
+
     public void runOneFrame() {
         ygba.runOneFrame();
+        SavePersistence sp = ygba.getSavePersistence();
+        if (sp != null) sp.flushIfSettled();
     }
 
     public void runFrames(int n) {

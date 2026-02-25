@@ -6,3 +6,5 @@ dumps/
 **/.!*
 **/*~
 **/*.swp
+gba_bios.bin
+/roms/*

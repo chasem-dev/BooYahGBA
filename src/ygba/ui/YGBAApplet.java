@@ -32,6 +32,7 @@ import javax.swing.SwingUtilities;
 
 import ygba.YGBA;
 import ygba.cpu.ARM7TDMI;
+import ygba.memory.SavePersistence;
 import ygba.dma.DMA;
 import ygba.dma.DirectMemoryAccess;
 import ygba.gfx.GFXScreen;
@@ -332,6 +333,7 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 		}
 		if (ygba.isReady()) {
 			ygba.reset();
+			setupSavePersistenceIfConfigured();
 			ygba.run();
 			setupPopupMenu(true);
 			System.out.println("[BOOT] core running");
@@ -365,6 +367,15 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 		requestFocusInWindow();
 	}
 
+	private void setupSavePersistenceIfConfigured() {
+		String romSource = memory.getLoadedROMSource();
+		if (romSource == null) return;
+		String saveDirPath = System.getProperty("ygba.save.dir", ".");
+		File saveDir = new File(saveDirPath);
+		if (!saveDir.exists()) saveDir.mkdirs();
+		ygba.setupSavePersistence(saveDir, romSource);
+	}
+
 	public void actionPerformed(ActionEvent ae) {
 		String actionCommand = ae.getActionCommand();
 
@@ -383,6 +394,7 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 				memory.loadBIOS(biosURL);
 				if (ygba.isReady()) {
 					ygba.reset();
+					setupSavePersistenceIfConfigured();
 					if (!isPaused)
 						ygba.run();
 					setupPopupMenu(true);
@@ -405,6 +417,7 @@ public final class YGBAApplet extends JApplet implements ActionListener, KeyList
 				memory.loadROM(romURL);
 				if (ygba.isReady()) {
 					ygba.reset();
+					setupSavePersistenceIfConfigured();
 					if (!isPaused)
 						ygba.run();
 					setupPopupMenu(true);

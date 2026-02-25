@@ -17,6 +17,8 @@ public final class SaveMemory
     private int state = STATE_READY;
     private int bankOffset = 0;  // 0 or 0x10000 for 128K flash
 
+    private SavePersistence persistence;
+
     // Sanyo 128KB Flash chip IDs (LE106F) — common for Pokemon FireRed
     private static final int MANUFACTURER_ID = 0x62;
     private static final int DEVICE_ID = 0x13;
@@ -24,6 +26,10 @@ public final class SaveMemory
 
     public SaveMemory() {
         super("Save RAM", 0x20000); // 128KB flash
+    }
+
+    public void setPersistence(SavePersistence p) {
+        this.persistence = p;
     }
 
 
@@ -117,12 +123,14 @@ public final class SaveMemory
                 if (offset == 0x5555 && v == 0x10) {
                     // Erase entire chip
                     for (int i = 0; i < space.length; i++) space[i] = (byte) 0xFF;
+                    if (persistence != null) persistence.markDirty();
                 } else if (v == 0x30) {
                     // Erase 4KB sector
                     int sector = bankOffset + (offset & 0xF000);
                     for (int i = sector; i < sector + 0x1000 && i < space.length; i++) {
                         space[i] = (byte) 0xFF;
                     }
+                    if (persistence != null) persistence.markDirty();
                 }
                 state = STATE_READY;
                 break;
@@ -130,6 +138,7 @@ public final class SaveMemory
             case STATE_WRITE:
                 // Single byte program (can only clear bits, not set them — but we'll allow any write)
                 space[bankOffset + offset] = value;
+                if (persistence != null) persistence.markDirty();
                 state = STATE_READY;
                 break;
 
@@ -143,6 +152,13 @@ public final class SaveMemory
             default:
                 state = STATE_READY;
         }
+    }
+
+    @Override
+    public void softReset() {
+        // Real flash survives soft reset — only reset state machine, not data
+        state = STATE_READY;
+        bankOffset = 0;
     }
 
     public void storeHalfWord(int offset, short value) {}

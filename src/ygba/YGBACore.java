@@ -3,6 +3,7 @@ package ygba;
 import ygba.cpu.ARM7TDMI;
 import ygba.memory.Memory;
 import ygba.memory.IORegMemory;
+import ygba.memory.SavePersistence;
 import ygba.time.Time;
 
 public final class YGBACore
@@ -16,6 +17,8 @@ public final class YGBACore
     private boolean framePacing = true;
     private final boolean debugConsole;
     private final boolean debugStatus;
+
+    private SavePersistence savePersistence;
 
     private int lastFramePC;
     private int stalledFrames;
@@ -60,6 +63,10 @@ public final class YGBACore
         this.framePacing = enabled;
     }
 
+    public void setSavePersistence(SavePersistence savePersistence) {
+        this.savePersistence = savePersistence;
+    }
+
     public void runOneFrame() {
         for (int scanline = 0; scanline < VLines; scanline++) {
             iorMem.setCurrentScanline(scanline);
@@ -83,6 +90,7 @@ public final class YGBACore
         while (!stopped) {
             runOneFrame();
 
+            if (savePersistence != null) savePersistence.flushIfSettled();
             if (debugConsole) logIfStalled();
             if (debugStatus) logPeriodicStatus();
 

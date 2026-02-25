@@ -65,8 +65,14 @@ public final class YGBAFrame extends JFrame {
 					System.setProperty("ygba.auto.dump.duration.ms", args[++i]);
 				} else if ("--auto-dump-exit".equals(arg)) {
 					System.setProperty("ygba.auto.dump.exit", "true");
+				} else if ("--save-dir".equals(arg)) {
+					if (i + 1 >= args.length) {
+						System.out.println("Missing value for --save-dir");
+						return false;
+					}
+					System.setProperty("ygba.save.dir", new File(args[++i]).getPath());
 				} else if ("--help".equals(arg) || "-h".equals(arg)) {
-					System.out.println("Usage: ./gradlew run --args='[--bios <file>] [--rom <file>] [--debugger] [--debug-console] [--status-log] [--trace-video] [--log-file <file>] [--auto-dump-interval-ms <ms>] [--auto-dump-duration-ms <ms>] [--auto-dump-exit]'");
+					System.out.println("Usage: ./gradlew run --args='[--bios <file>] [--rom <file>] [--debugger] [--debug-console] [--status-log] [--trace-video] [--log-file <file>] [--auto-dump-interval-ms <ms>] [--auto-dump-duration-ms <ms>] [--auto-dump-exit] [--save-dir <dir>]'");
 					return false;
 				} else {
 					System.out.println("Unknown argument: " + arg);
@@ -103,8 +109,10 @@ public final class YGBAFrame extends JFrame {
 		System.out.println("[BOOT] biosArg=" + (bios != null ? new File(bios).getAbsolutePath() : "<default>"));
 		System.out.println("[BOOT] romArg=" + (rom != null ? new File(rom).getAbsolutePath() : "<default>"));
 		System.out.println("[BOOT] logFile=" + (logFile != null ? new File(logFile).getAbsolutePath() : "<none>"));
+		String saveDir = System.getProperty("ygba.save.dir", ".");
 		System.out.println("[BOOT] traceVideo=" + traceVideo);
 		System.out.println("[BOOT] hleSwi=" + hleSwi);
+		System.out.println("[BOOT] saveDir=" + new File(saveDir).getAbsolutePath());
 	}
 
 	public static void main(String[] args) {

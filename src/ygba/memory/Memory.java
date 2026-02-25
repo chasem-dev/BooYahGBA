@@ -82,6 +82,10 @@ public final class Memory
     public IORegMemory getIORegMemory() {
         return (IORegMemory) getBank(0x04);
     }
+
+    public SaveMemory getSaveMemory() {
+        return (SaveMemory) getBank(0x0E);
+    }
     
     public int getInternalOffset(int bankNumber, int offset) {
         return ((MemoryManager) getBank(bankNumber)).getInternalOffset(offset);
